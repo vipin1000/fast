@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 from bs4 import BeautifulSoup
-from langchain_community.vectorstores import FAISS
+from langchain_community.vectorstores import Chroma
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -42,8 +42,8 @@ STATIC_URLS = [
     "https://www.velocis.in/events"
 ]  
 API_URL = "https://2ec875982955.ngrok-free.app/generate"  # Update as needed
-FAISS_INDEX_PATH = "faiss_index"
-REBUILD_EMBEDDINGS = False # Set True to rebuild embeddings, False to load existing
+CHROMA_INDEX_PATH = "chroma_index"
+REBUILD_EMBEDDINGS = True # Set True to rebuild embeddings, False to load existing
 
 app = FastAPI(title="RAG Backend API")
 
@@ -99,14 +99,14 @@ def extract_visible_text_with_selenium(url: str) -> str:
     finally:
         driver.quit()
 
-# === FAISS Load or Build ===
+# === Chroma Load or Build ===
 def load_or_build_vectorstore():
     embeddings = HuggingFaceEmbeddings()
-    if os.path.exists(FAISS_INDEX_PATH) and not REBUILD_EMBEDDINGS:
-        print("🔍 Loading FAISS index from disk...")
-        return FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
+    if os.path.exists(CHROMA_INDEX_PATH) and not REBUILD_EMBEDDINGS:
+        print("🔍 Loading Chroma index from disk...")
+        return Chroma(persist_directory=CHROMA_INDEX_PATH, embedding_function=embeddings)
     else:
-        print("🚀 Building FAISS index from scratch...")
+        print("🚀 Building Chroma index from scratch...")
         documents = []
         for url in STATIC_URLS:
             text = extract_visible_text_with_selenium(url)
@@ -114,8 +114,8 @@ def load_or_build_vectorstore():
                 documents.append(Document(page_content=text, metadata={"source": url}))
         splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
         chunks = splitter.split_documents(documents)
-        vectorstore = FAISS.from_documents(chunks, embedding=embeddings)
-        vectorstore.save_local(FAISS_INDEX_PATH)
+        vectorstore = Chroma.from_documents(chunks, embedding=embeddings, persist_directory=CHROMA_INDEX_PATH)
+        vectorstore.persist()
         return vectorstore
 
 # === Retrieval ===

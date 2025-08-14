@@ -9,8 +9,8 @@ services:
       pip install -r requirements.txt
     startCommand: uvicorn fast:app --host 0.0.0.0 --port $PORT --workers 1
     disk:
-      name: faiss-data
-      mountPath: /opt/render/project/src/faiss_index
+      name: chroma-data
+      mountPath: /opt/render/project/src/chroma_index
       sizeGB: 0.5  # Increase if storing more data
     envVars:
       - key: CHROME_BIN
