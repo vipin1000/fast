@@ -2,7 +2,7 @@ services:
   - type: web
     name: rag-backend
     env: python
-    plan: starter   # or higher for more resources
+    plan: standard   # Upgraded for more memory
     buildCommand: |
       apt-get update && apt-get install -y chromium chromium-driver
       python -m pip install --upgrade pip setuptools wheel

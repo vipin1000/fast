@@ -43,7 +43,7 @@ STATIC_URLS = [
 ]  
 API_URL = "https://2ec875982955.ngrok-free.app/generate"  # Update as needed
 CHROMA_INDEX_PATH = "chroma_index"
-REBUILD_EMBEDDINGS = True # Set True to rebuild embeddings, False to load existing
+REBUILD_EMBEDDINGS = False # Set True to rebuild embeddings, False to load existing
 
 app = FastAPI(title="RAG Backend API")
 
@@ -101,7 +101,12 @@ def extract_visible_text_with_selenium(url: str) -> str:
 
 # === Chroma Load or Build ===
 def load_or_build_vectorstore():
-    embeddings = HuggingFaceEmbeddings()
+    # Use a smaller model to reduce memory usage
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2",
+        model_kwargs={'device': 'cpu'},
+        encode_kwargs={'normalize_embeddings': True}
+    )
     if os.path.exists(CHROMA_INDEX_PATH) and not REBUILD_EMBEDDINGS:
         print("🔍 Loading Chroma index from disk...")
         return Chroma(persist_directory=CHROMA_INDEX_PATH, embedding_function=embeddings)
@@ -126,9 +131,11 @@ def retrieve_relevant_context(query, vectorstore, top_k=5):
 
 # === Initialize on Startup ===
 @app.on_event("startup")
-def startup_event():
+async def startup_event():
     global VECTORSTORE
-    VECTORSTORE = load_or_build_vectorstore()
+    # Lazy load to reduce memory usage during startup
+    print("🚀 Starting up RAG Backend API...")
+    print("📚 Vectorstore will be loaded on first request to save memory")
 
 # === Health Check ===
 @app.get("/")
@@ -140,7 +147,9 @@ def health_check():
 def process_query(payload: QueryRequest):
     global VECTORSTORE
     if VECTORSTORE is None:
-        raise HTTPException(status_code=500, detail="Vectorstore is not initialized.")
+        print("🔄 Loading vectorstore on first request...")
+        VECTORSTORE = load_or_build_vectorstore()
+        print("✅ Vectorstore loaded successfully!")
 
     context = retrieve_relevant_context(payload.query, VECTORSTORE)
 
