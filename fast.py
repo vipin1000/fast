@@ -41,7 +41,7 @@ STATIC_URLS = [
     "https://www.velocis.in/listing",
     "https://www.velocis.in/events"
 ]  
-API_URL = "https://2ec875982955.ngrok-free.app/generate"  # Update as needed
+API_URL = "https://7649cc6059e9.ngrok-free.app/generate"  # Update as needed
 CHROMA_INDEX_PATH = "chroma_index"
 REBUILD_EMBEDDINGS = False # Set True to rebuild embeddings, False to load existing
 
@@ -133,25 +133,33 @@ def retrieve_relevant_context(query, vectorstore, top_k=5):
 @app.on_event("startup")
 async def startup_event():
     global VECTORSTORE
-    # Lazy load to reduce memory usage during startup
     print("🚀 Starting up RAG Backend API...")
     print("📚 Vectorstore will be loaded on first request to save memory")
+    # Don't load anything heavy during startup
 
 # === Health Check ===
 @app.get("/")
 def health_check():
-    return {"status": "healthy", "message": "RAG Backend API is running"}
+    return {"status": "healthy", "message": "RAG Backend API is running", "vectorstore_loaded": VECTORSTORE is not None}
+
+@app.get("/test")
+def test_endpoint():
+    return {"message": "API is working!", "timestamp": time.time()}
 
 # === Query Endpoint ===
 @app.post("/chat/query", response_model=QueryResponse)
 def process_query(payload: QueryRequest):
     global VECTORSTORE
-    if VECTORSTORE is None:
-        print("🔄 Loading vectorstore on first request...")
-        VECTORSTORE = load_or_build_vectorstore()
-        print("✅ Vectorstore loaded successfully!")
+    try:
+        if VECTORSTORE is None:
+            print("🔄 Loading vectorstore on first request...")
+            VECTORSTORE = load_or_build_vectorstore()
+            print("✅ Vectorstore loaded successfully!")
 
-    context = retrieve_relevant_context(payload.query, VECTORSTORE)
+        context = retrieve_relevant_context(payload.query, VECTORSTORE)
+    except Exception as e:
+        print(f"❌ Error loading vectorstore: {e}")
+        raise HTTPException(status_code=500, detail=f"Vectorstore error: {str(e)}")
 
     full_context = (
         "\n\n[Relevant Context:]\n" + context +
