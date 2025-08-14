@@ -10,40 +10,43 @@ from langchain_community.vectorstores import Chroma
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
 from langchain_huggingface import HuggingFaceEmbeddings
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+
 
 
 
 # === Configuration ===
 STATIC_URLS = [
-    "https://www.velocis.in/",
-    "https://www.velocis.in/about",
-    "https://www.velocis.in/meet-the-leaders",
-    "https://www.velocis.in/domains/enterprise-network",
-    "https://www.velocis.in/domains/cybersecurity",
-    "https://www.velocis.in/domains/digital-workplace",
-    "https://www.velocis.in/domains/data-centre",
-    "https://www.velocis.in/domains/public-cloud",
-    "https://www.velocis.in/domains/application-transformation",
-    "https://www.velocis.in/products/bullseye",
-    "https://www.velocis.in/products/observer",
-    "https://www.velocis.in/products/compliance-engine",
-    "https://www.velocis.in/services/customer-experience-services",
-    "https://www.velocis.in/services/engineering-services",
-    "https://www.velocis.in/services/managed-services",
-    "https://www.velocis.in/services/professional-services",
-    "https://www.velocis.in/careers",
-    "https://www.velocis.in/life-at-velocis",
-    "https://www.velocis.in/blog",
-    "https://www.velocis.in/case-studies",
-    "https://www.velocis.in/contact-us",
-    "https://www.velocis.in/listing",
-    "https://www.velocis.in/events"
+    # "https://www.velocis.in/",
+    # "https://www.velocis.in/about",
+    # "https://www.velocis.in/meet-the-leaders",
+    # "https://www.velocis.in/domains/enterprise-network",
+    # "https://www.velocis.in/domains/cybersecurity",
+    # "https://www.velocis.in/domains/digital-workplace",
+    # "https://www.velocis.in/domains/data-centre",
+    # "https://www.velocis.in/domains/public-cloud",
+    # "https://www.velocis.in/domains/application-transformation",
+    # "https://www.velocis.in/products/bullseye",
+    # "https://www.velocis.in/products/observer",
+    # "https://www.velocis.in/products/compliance-engine",
+    # "https://www.velocis.in/services/customer-experience-services",
+    # "https://www.velocis.in/services/engineering-services",
+    # "https://www.velocis.in/services/managed-services",
+    # "https://www.velocis.in/services/professional-services",
+    # "https://www.velocis.in/careers",
+    # "https://www.velocis.in/life-at-velocis",
+    # "https://www.velocis.in/blog",
+    # "https://www.velocis.in/case-studies",
+    # "https://www.velocis.in/contact-us",
+    # "https://www.velocis.in/listing",
+    "https://asdf-self-delta.vercel.app/",
+    "https://asdf-self-delta.vercel.app/contact.html",
+    "https://asdf-self-delta.vercel.app/properties.html",
+    "https://asdf-self-delta.vercel.app/services.html",
+    "https://asdf-self-delta.vercel.app/about.html"
 ]  
 API_URL = "https://7649cc6059e9.ngrok-free.app/generate"  # Update as needed
 CHROMA_INDEX_PATH = "chroma_index"
-REBUILD_EMBEDDINGS = False # Set True to rebuild embeddings, False to load existing
+REBUILD_EMBEDDINGS = True # Set True to rebuild embeddings, False to load existing
 
 app = FastAPI(title="RAG Backend API")
 
@@ -69,35 +72,40 @@ class QueryResponse(BaseModel):
 VECTORSTORE = None
 
 # === Scraping ===
-def extract_visible_text_with_selenium(url: str) -> str:
-    options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--remote-debugging-port=9222")
-    options.add_argument("--disable-extensions")
-    options.add_argument("--disable-plugins")
-    options.add_argument("--disable-images")
-    options.add_argument("--disable-javascript")
-    
-    # Use environment variables for Chrome paths on Render
-    chrome_bin = os.getenv("CHROME_BIN", "/usr/bin/chromium")
-    chromedriver_path = os.getenv("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
-    
-    options.binary_location = chrome_bin
-    driver = webdriver.Chrome(options=options)
+def extract_visible_text_with_requests(url: str) -> str:
     try:
-        driver.get(url)
-        time.sleep(3)
-        html = driver.page_source
-        soup = BeautifulSoup(html, "html.parser")
-        for tag in soup(["script", "style", "noscript"]):
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.content, "html.parser")
+        
+        # Remove script and style elements
+        for tag in soup(["script", "style", "noscript", "nav", "footer"]):
             tag.decompose()
-        visible_text = soup.get_text(separator="\n")
-        return "\n".join([line.strip() for line in visible_text.splitlines() if line.strip()])
-    finally:
-        driver.quit()
+        
+        # Extract text from main content areas
+        main_content = ""
+        
+        # Try to find main content areas
+        for selector in ['main', 'article', '.content', '#content', '.main', '#main']:
+            elements = soup.select(selector)
+            if elements:
+                main_content += " ".join([elem.get_text(separator="\n") for elem in elements])
+        
+        # If no main content found, get all text
+        if not main_content:
+            main_content = soup.get_text(separator="\n")
+        
+        # Clean up the text
+        lines = [line.strip() for line in main_content.splitlines() if line.strip()]
+        return "\n".join(lines)
+        
+    except Exception as e:
+        print(f"Error scraping {url}: {e}")
+        return f"Error accessing {url}: {str(e)}"
 
 # === Chroma Load or Build ===
 def load_or_build_vectorstore():
@@ -114,7 +122,7 @@ def load_or_build_vectorstore():
         print("🚀 Building Chroma index from scratch...")
         documents = []
         for url in STATIC_URLS:
-            text = extract_visible_text_with_selenium(url)
+            text = extract_visible_text_with_requests(url)
             if text:
                 documents.append(Document(page_content=text, metadata={"source": url}))
         splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
