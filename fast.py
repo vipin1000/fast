@@ -40,11 +40,6 @@ STATIC_URLS = [
     "https://www.velocis.in/contact-us",
     "https://www.velocis.in/listing",
     "https://www.velocis.in/events"
-    # "https://asdf-self-delta.vercel.app/index.html",
-    # "https://asdf-self-delta.vercel.app/about.html",
-    # "https://asdf-self-delta.vercel.app/services.html",
-    # "https://asdf-self-delta.vercel.app/properties.html",
-    # "https://asdf-self-delta.vercel.app/contact.html"
 ]  
 API_URL = "https://2ec875982955.ngrok-free.app/generate"  # Update as needed
 FAISS_INDEX_PATH = "faiss_index"
@@ -79,6 +74,18 @@ def extract_visible_text_with_selenium(url: str) -> str:
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--remote-debugging-port=9222")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-plugins")
+    options.add_argument("--disable-images")
+    options.add_argument("--disable-javascript")
+    
+    # Use environment variables for Chrome paths on Render
+    chrome_bin = os.getenv("CHROME_BIN", "/usr/bin/chromium")
+    chromedriver_path = os.getenv("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
+    
+    options.binary_location = chrome_bin
     driver = webdriver.Chrome(options=options)
     try:
         driver.get(url)
@@ -122,6 +129,11 @@ def retrieve_relevant_context(query, vectorstore, top_k=5):
 def startup_event():
     global VECTORSTORE
     VECTORSTORE = load_or_build_vectorstore()
+
+# === Health Check ===
+@app.get("/")
+def health_check():
+    return {"status": "healthy", "message": "RAG Backend API is running"}
 
 # === Query Endpoint ===
 @app.post("/chat/query", response_model=QueryResponse)
