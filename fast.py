@@ -44,9 +44,9 @@ STATIC_URLS = [
     "https://asdf-self-delta.vercel.app/services.html",
     "https://asdf-self-delta.vercel.app/about.html"
 ]  
-API_URL = "https://7649cc6059e9.ngrok-free.app/generate"  # Update as needed
+API_URL = "https://4b4b4e5785b2.ngrok-free.app/generate"  # Update as needed
 CHROMA_INDEX_PATH = "chroma_index"
-REBUILD_EMBEDDINGS = True # Set True to rebuild embeddings, False to load existing
+REBUILD_EMBEDDINGS = False # Set True to rebuild embeddings, False to load existing
 
 app = FastAPI(title="RAG Backend API")
 
