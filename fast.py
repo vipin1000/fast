@@ -44,7 +44,7 @@ STATIC_URLS = [
     "https://asdf-self-delta.vercel.app/services.html",
     "https://asdf-self-delta.vercel.app/about.html"
 ]  
-API_URL = "https://4b4b4e5785b2.ngrok-free.app/generate"  # Update as needed
+API_URL = "https://5931b1f220c3.ngrok-free.app/generate"  # Update as needed
 CHROMA_INDEX_PATH = "chroma_index"
 REBUILD_EMBEDDINGS = False # Set True to rebuild embeddings, False to load existing
 
